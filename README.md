@@ -15,7 +15,7 @@ Extraction scripts
 Databases
 ===
 
-Consider using UCI's own AsterixDB for exploring reddit data.
+Consider using UCI's own [AsterixDB](https://asterixdb.ics.uci.edu/) for exploring reddit data.
 
 
 Useful libraries & tools
