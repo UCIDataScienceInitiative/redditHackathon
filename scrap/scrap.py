@@ -1,10 +1,11 @@
-import urllib2
-import sys
-from splinter.browser import Browser
-import re
 from collections import deque
+import urllib2
+import HTMLParser
+import sys
+import re
 import json
 import os
+
 
 DATA_FOLDER = 'data/'
 HTML_DATA = 'html_data/'
@@ -31,19 +32,35 @@ DATETIME_RE = r'datetime="[\d\sA-Z:\-]+';
 
 # Dictonary keys
 ID = 'id';
-USER = 'user';
+USER = 'username';
 PARENT_ID = 'parent_id'
-CHILDREN = 'successors';
-LIST = 'the_list';
-COMMENT = 'wrote';
+LIST = 'children';
+COMMENT = 'text';
 POINTS = 'points';
 
+
+# Common html codes
+HTML_CODES = [('&#39;', "'",), ('&quot;','"'),('&gt;', '>'),( '&lt;', '<'),('&amp;', '&')]
 
 
 def scrapUserComments(html_block):
     ''' Scrap user comments from a comment block '''
     comment_str = re.findall(COMMENT_LINES_RE, html_block, re.DOTALL)[0]
-    return comment_str.replace('<p>', '').replace('</p>', '');
+    comment_str = comment_str.replace('<p>', '').replace('</p>', '');
+    for code in HTML_CODES:
+        comment_str = comment_str.replace(code[0], code[1])
+    # Transform References to urls
+    refs = re.findall(r'<a[^\r\n]*?</a>', comment_str);
+    for r in refs:
+        u_list = re.findall('href=".*?"', r)
+        if len(u_list) != 1 : continue
+        u = u_list[0].replace("href=", ' ').replace('"','')
+        comment_str =  comment_str.replace(r, u)
+    # Remove html tags
+    tags = re.findall('<\/?[a-z]+>', comment_str);
+    for t in tags:
+        comment_str = comment_str.replace(t, '')
+    return comment_str
 
 
 
@@ -98,14 +115,13 @@ def buildCommentTree(comment_list):
     for c, block in enumerate(comment_list):
         # Extract id
         ID = scrapCommentID(block)
-        if not ID: return
+        if not ID: continue
         # Extract other items
         node = {}       
         try:
             node[PARENT_ID] = scrapParentName(block)
             node[USER] = scrapUsername(block)
             node[COMMENT] = scrapUserComments(block) 
-            # node[CHILDREN] = scrapChildrenNum(block)
             node[POINTS] = scrapPoints(block)
             node[LIST] = []
         except IndexError:
@@ -147,6 +163,7 @@ def main():
         # Scrap info from html, and save it in a file
         raw_comments = re.findall(COMMENT_BLOCK_RE, data, re.DOTALL)
         tree_dict = buildCommentTree(raw_comments)
+        if not len(tree_dict): continue
         new_file = filename.replace('html', 'json')
         json.dump(tree_dict, open('%s%s'%(JSON_DATA, new_file), 'w'))
 
@@ -160,7 +177,10 @@ if __name__ == '__main__':
 
     ''' Test code '''
     #filename = 'html_data/my_christmas_presents_to_myself_finally_turned_up.html'
+    #filename = 'html_data/xlyyr.html'
     filename = 'html_data/gxou8.html'
+    
+    
     data = open(filename).read()
 
     # Extract the comment blocks
@@ -170,7 +190,7 @@ if __name__ == '__main__':
     tree_dict = buildCommentTree(raw_comments)
 
     # show tree structure
-    # printCommentTree(tree_dict) 
+    printCommentTree(tree_dict) 
 
     new_file = filename.replace('html', 'json')
     json.dump(tree_dict, open(new_file, 'w'))
